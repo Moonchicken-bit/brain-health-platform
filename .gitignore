@@ -1,0 +1,65 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+
+# Java / Maven build output
+**/target/
+*.jar
+*.war
+*.class
+.mvn/timing.properties
+
+# Node / frontend build output
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data and medical uploads
+**/data/
+!**/src/**/data/
+**/data/unified-imports/
+**/uploads/
+**/backups/
+**/runtime-data/
+
+# Deployment archives and offline images
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.dump
+*.rdb
+
+# Logs and temporary output
+*.log
+/tmp/
+**/tmp/
+*.tmp
+*.temp
+
+# IDE and operating system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local tooling state
+.superpowers/
+.codex/

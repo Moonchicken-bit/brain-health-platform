@@ -1,0 +1,5 @@
+-- Canonical reference/code tables and their seed data are defined in
+-- V001__core.sql. The former V010 script duplicated those tables with
+-- incompatible column names (for example panel_code versus code), which made
+-- a clean Docker initialization fail. It is intentionally retained as an
+-- empty migration number for upgrade-history compatibility.

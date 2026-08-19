@@ -1,0 +1,280 @@
+name: brain-health-platform
+
+x-service-common: &service-common
+  restart: unless-stopped
+  environment: &service-env
+    TZ: Asia/Shanghai
+    JWT_SECRET: ${JWT_SECRET}
+    SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+    SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+    SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+    SPRING_DATA_REDIS_HOST: redis
+    SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+    SPRING_DATA_MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/brain_health?authSource=admin
+  networks: [bh-network]
+
+services:
+  mysql:
+    image: mysql:8.0.35
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: brain_health
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--default-time-zone=+08:00", "--max-allowed-packet=512M"]
+    volumes: ["${DATA_ROOT}/mysql:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [bh-network]
+
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: brain_health
+    volumes: ["${DATA_ROOT}/mongodb:/data/db"]
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'quit(db.runCommand({ping:1}).ok ? 0 : 2)'"]
+      interval: 10s
+      timeout: 8s
+      retries: 30
+    networks: [bh-network]
+
+  minio:
+    image: minio/minio:RELEASE.2024-04-18T19-09-19Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    volumes: ["${DATA_ROOT}/minio:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [bh-network]
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    environment: { REDIS_PASSWORD: "${REDIS_PASSWORD}" }
+    volumes: ["${DATA_ROOT}/redis:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [bh-network]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.3
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS}
+    volumes: ["${DATA_ROOT}/elasticsearch:/usr/share/elasticsearch/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+    networks: [bh-network]
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes: ["${DATA_ROOT}/rabbitmq:/var/lib/rabbitmq"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+    networks: [bh-network]
+
+  nacos:
+    image: nacos/nacos-server:v2.3.1
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_IDENTITY_KEY}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_IDENTITY_VALUE}
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
+    volumes: ["${DATA_ROOT}/nacos:/home/nacos/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8848/nacos/v1/console/health/readiness >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+    networks: [bh-network]
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    networks: [bh-network]
+
+  auth-service:
+    <<: *service-common
+    image: brain-health/auth-service:${APP_VERSION}
+    environment:
+      <<: *service-env
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      RESET_MAIL_FROM: ${RESET_MAIL_FROM}
+      OTP_ENCRYPTION_KEY: ${OTP_ENCRYPTION_KEY}
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+
+  subject-service:
+    <<: *service-common
+    image: brain-health/subject-service:${APP_VERSION}
+    volumes: ["${DATA_ROOT}/unified-imports:/app/data/unified-imports"]
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+
+  scale-service:
+    <<: *service-common
+    image: brain-health/scale-service:${APP_VERSION}
+    environment:
+      <<: *service-env
+      SCALE_CLINICAL_FIELD_DICTIONARY_PATH: /app/clinical_field_dictionary.json
+    volumes: ["./resources/clinical_field_dictionary.json:/app/clinical_field_dictionary.json:ro"]
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+
+  imaging-service:
+    <<: *service-common
+    image: brain-health/imaging-service:${APP_VERSION}
+    environment:
+      <<: *service-env
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+    depends_on:
+      mysql: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  genetics-service:
+    <<: *service-common
+    image: brain-health/genetics-service:${APP_VERSION}
+    environment:
+      <<: *service-env
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+    depends_on:
+      mysql: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  lab-service:
+    <<: *service-common
+    image: brain-health/lab-service:${APP_VERSION}
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+
+  search-service:
+    <<: *service-common
+    image: brain-health/search-service:${APP_VERSION}
+    environment:
+      <<: *service-env
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+      elasticsearch: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  export-service:
+    <<: *service-common
+    image: brain-health/export-service:${APP_VERSION}
+    environment:
+      <<: *service-env
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  audit-service:
+    <<: *service-common
+    image: brain-health/audit-service:${APP_VERSION}
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  adni-service:
+    <<: *service-common
+    image: brain-health/adni-service:${APP_VERSION}
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mongodb: { condition: service_healthy }
+
+  gateway:
+    <<: *service-common
+    image: brain-health/gateway:${APP_VERSION}
+    environment:
+      <<: *service-env
+      AUTH_SERVICE_URL: http://auth-service:8001
+      SUBJECT_SERVICE_URL: http://subject-service:8002
+      SCALE_SERVICE_URL: http://scale-service:8003
+      IMAGING_SERVICE_URL: http://imaging-service:8004
+      GENETICS_SERVICE_URL: http://genetics-service:8005
+      LAB_SERVICE_URL: http://lab-service:8006
+      SEARCH_SERVICE_URL: http://search-service:8007
+      EXPORT_SERVICE_URL: http://export-service:8008
+      AUDIT_SERVICE_URL: http://audit-service:8009
+      ADNI_SERVICE_URL: http://adni-service:8010
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+    depends_on:
+      auth-service: { condition: service_started }
+      subject-service: { condition: service_started }
+      scale-service: { condition: service_started }
+      imaging-service: { condition: service_started }
+      genetics-service: { condition: service_started }
+      lab-service: { condition: service_started }
+      search-service: { condition: service_started }
+      export-service: { condition: service_started }
+      audit-service: { condition: service_started }
+      adni-service: { condition: service_started }
+
+  frontend:
+    image: brain-health/frontend:${APP_VERSION}
+    restart: unless-stopped
+    depends_on: [gateway]
+    ports: ["${APP_BIND_IP}:${APP_PORT}:80"]
+    networks: [bh-network]
+
+networks:
+  bh-network:
+    driver: bridge

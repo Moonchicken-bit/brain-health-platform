@@ -1,0 +1,6 @@
+-- V001__core.sql contains the canonical roles, permissions, code tables,
+-- instruments, imaging modalities, lab panels and lab analytes.
+--
+-- The former V011 seed targeted obsolete sys_* and item_code/item_name table
+-- layouts and could not run against V001. This placeholder preserves the
+-- migration sequence without inserting duplicate or corrupted reference data.

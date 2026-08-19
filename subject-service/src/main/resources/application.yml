@@ -1,0 +1,38 @@
+server:
+  port: 8002
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: subject-service
+  servlet:
+    multipart:
+      max-file-size: 10GB
+      max-request-size: 10GB
+  datasource:
+    url: jdbc:mysql://localhost:3306/brain_health?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: bh_user
+    password: bh_pass_2024
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redis_pass_2024
+
+logging:
+  level:
+    com.brainhealth: DEBUG
+    root: INFO

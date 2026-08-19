@@ -1,0 +1,14 @@
+**/target
+**/node_modules
+**/dist
+**/*.log
+tmp
+data
+deploy
+*.zip
+*.rar
+*.tar
+*.tar.gz
+.git
+.github
+brain-health-web

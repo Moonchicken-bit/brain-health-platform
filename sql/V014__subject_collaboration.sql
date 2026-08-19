@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS subject_favorite (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    subject_id BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_subject_favorite_user_subject UNIQUE (user_id, subject_id)
+);
+
+CREATE TABLE IF NOT EXISTS subject_business_tag (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    project_id BIGINT NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    color VARCHAR(20),
+    created_by BIGINT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_subject_tag_project_name UNIQUE (project_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS subject_tag_assignment (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    subject_id BIGINT NOT NULL,
+    tag_id BIGINT NOT NULL,
+    created_by BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_subject_tag_assignment UNIQUE (subject_id, tag_id)
+);
+
+CREATE TABLE IF NOT EXISTS subject_project_note (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    subject_id BIGINT NOT NULL,
+    project_id BIGINT NOT NULL,
+    revision_no INT NOT NULL,
+    content VARCHAR(2000) NOT NULL,
+    created_by BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_subject_note_history (subject_id, revision_no)
+);

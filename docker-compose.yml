@@ -1,0 +1,362 @@
+services:
+  # ============================================
+  # MySQL 8.0 - Structured Data
+  # ============================================
+  mysql:
+    image: mysql:8.0.35
+    container_name: brainhealth-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: BrainHealth@2024
+      MYSQL_DATABASE: brain_health
+      MYSQL_USER: bh_user
+      MYSQL_PASSWORD: bh_pass_2024
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      - --max-allowed-packet=256M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pBrainHealth@2024"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bh-network
+
+  # ============================================
+  # MongoDB 7 - Unstructured/Metadata
+  # ============================================
+  mongodb:
+    image: mongo:7.0
+    container_name: brainhealth-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: mongo_admin_2024
+      MONGO_INITDB_DATABASE: brain_health
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bh-network
+
+  # ============================================
+  # MinIO - Object Storage (DICOM, NIfTI, VCF)
+  # ============================================
+  minio:
+    image: minio/minio:RELEASE.2024-04-18T19-09-19Z
+    container_name: brainhealth-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minio_admin_2024
+    ports:
+      - "127.0.0.1:9000:9000"   # API
+      - "127.0.0.1:9001:9001"   # Console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bh-network
+
+  # ============================================
+  # Redis 7 - Cache & Session
+  # ============================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: brainhealth-redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_pass_2024 --appendonly yes
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bh-network
+
+  # ============================================
+  # Elasticsearch 8 - Full-text Search
+  # ============================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.3
+    container_name: brainhealth-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ports:
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health || exit 0"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - bh-network
+
+  # ============================================
+  # RabbitMQ 3.12 - Message Queue
+  # ============================================
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: brainhealth-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: bh_user
+      RABBITMQ_DEFAULT_PASS: rabbitmq_pass_2024
+    ports:
+      - "127.0.0.1:5672:5672"   # AMQP
+      - "127.0.0.1:15672:15672" # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bh-network
+
+  # ============================================
+  # Nacos 2.3 - Service Discovery & Config
+  # ============================================
+  nacos:
+    image: nacos/nacos-server:v2.3.1
+    container_name: brainhealth-nacos
+    restart: unless-stopped
+    environment:
+      - MODE=standalone
+      - PREFER_HOST_MODE=hostname
+      - NACOS_AUTH_ENABLE=true
+      - NACOS_AUTH_IDENTITY_KEY=serverIdentity
+      - NACOS_AUTH_IDENTITY_VALUE=security
+      - NACOS_AUTH_TOKEN=SecretKey012345678901234567890123456789012345678901234567890123456789
+    ports:
+      - "127.0.0.1:8848:8848"
+      - "127.0.0.1:9848:9848"
+    volumes:
+      - nacos-data:/home/nacos/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bh-network
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+    networks: [bh-network]
+
+  auth-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: auth-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      RESET_MAIL_FROM: no-reply@brainhealth.local
+      OTP_ENCRYPTION_KEY: ${OTP_ENCRYPTION_KEY:-development-only-change-this-key-123456}
+    depends_on: [mysql, redis, mailpit]
+    networks: [bh-network]
+
+  subject-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: subject-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+    depends_on: [mysql, redis, mongodb]
+    networks: [bh-network]
+
+  scale-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: scale-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+      SCALE_CLINICAL_FIELD_DICTIONARY_PATH: /app/clinical_field_dictionary.json
+    volumes:
+      - ../clinical_field_dictionary.json:/app/clinical_field_dictionary.json:ro
+    depends_on: [mysql, redis]
+    networks: [bh-network]
+
+  imaging-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: imaging-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minio_admin_2024
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+    depends_on: [mysql, minio]
+    networks: [bh-network]
+
+  genetics-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: genetics-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minio_admin_2024
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+    depends_on: [mysql, minio]
+    networks: [bh-network]
+
+  lab-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: lab-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+    depends_on: [mysql, redis, mongodb]
+    networks: [bh-network]
+
+  search-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: search-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: bh_user
+      SPRING_RABBITMQ_PASSWORD: rabbitmq_pass_2024
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+    depends_on: [mysql, elasticsearch, rabbitmq, redis, mongodb]
+    networks: [bh-network]
+
+  export-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: export-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minio_admin_2024
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+    depends_on: [mysql, minio, redis, mongodb]
+    networks: [bh-network]
+
+  audit-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: audit-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+    depends_on: [mysql, redis]
+    networks: [bh-network]
+
+  adni-service:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: adni-service } }
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+    depends_on: [mysql, redis, mongodb]
+    networks: [bh-network]
+
+  gateway:
+    restart: unless-stopped
+    build: { context: ., dockerfile: Dockerfile.service, args: { MODULE: gateway } }
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8001
+      SUBJECT_SERVICE_URL: http://subject-service:8002
+      SCALE_SERVICE_URL: http://scale-service:8003
+      IMAGING_SERVICE_URL: http://imaging-service:8004
+      GENETICS_SERVICE_URL: http://genetics-service:8005
+      LAB_SERVICE_URL: http://lab-service:8006
+      SEARCH_SERVICE_URL: http://search-service:8007
+      EXPORT_SERVICE_URL: http://export-service:8008
+      AUDIT_SERVICE_URL: http://audit-service:8009
+      ADNI_SERVICE_URL: http://adni-service:8010
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis_pass_2024
+      SPRING_DATA_MONGODB_URI: mongodb://admin:mongo_admin_2024@mongodb:27017/brain_health?authSource=admin
+    depends_on:
+      - auth-service
+      - subject-service
+      - scale-service
+      - imaging-service
+      - genetics-service
+      - lab-service
+      - search-service
+      - export-service
+      - audit-service
+      - adni-service
+      - redis
+    ports: ["127.0.0.1:8080:8080"]
+    networks: [bh-network]
+
+  frontend:
+    restart: unless-stopped
+    build: ./brain-health-web
+    depends_on: [gateway]
+    ports:
+      - "127.0.0.1:5173:80"
+      - "100.124.109.15:80:80"
+    networks: [bh-network]
+
+volumes:
+  mysql-data:
+  mongo-data:
+  minio-data:
+  redis-data:
+  es-data:
+  rabbitmq-data:
+  nacos-data:
+
+networks:
+  bh-network:
+    driver: bridge

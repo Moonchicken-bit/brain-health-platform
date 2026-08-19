@@ -1,0 +1,7 @@
+-- Lab tables and reference data are defined in V001__core.sql.
+--
+-- The former V006 script defined a second, incompatible set of tables using
+-- the same lab_test_panel name (category_id/panel_code versus code/name).
+-- It was never used by lab-service, which persists lab_test_item and
+-- lab_result. Keeping one canonical schema makes clean installations
+-- deterministic and prevents initialization from stopping on column errors.

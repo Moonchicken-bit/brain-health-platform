@@ -1,0 +1,34 @@
+server:
+  port: 8004
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minio_admin_2024}
+spring:
+  servlet:
+    multipart:
+      max-file-size: 64MB
+      max-request-size: 64MB
+  application:
+    name: imaging-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: bh_user
+    password: bh_pass_2024
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redis_pass_2024
+logging:
+  level:
+    com.brainhealth: DEBUG
+    root: INFO
+brain-health:
+  imaging:
+    chunk-root: ${java.io.tmpdir}/brain-health/imaging-chunks

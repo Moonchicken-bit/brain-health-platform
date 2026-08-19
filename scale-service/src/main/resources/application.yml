@@ -1,0 +1,50 @@
+server:
+  port: 8003
+
+scale:
+  metadata:
+    path: ../../clinical_scale_metadata.json
+  clinical-field-dictionary:
+    path: ../clinical_field_dictionary.json
+
+visit:
+  attachment:
+    storage-root: ./data/visit-attachments
+    max-size-bytes: 52428800
+
+brain-health:
+  ocr:
+    executable: ${OCR_EXECUTABLE:C:\Program Files\Tesseract-OCR\tesseract.exe}
+    data-path: ${OCR_DATA_PATH:./data/tessdata}
+    language: ${OCR_LANGUAGE:chi_sim}
+
+spring:
+  application:
+    name: scale-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: bh_user
+    password: bh_pass_2024
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redis_pass_2024
+
+logging:
+  level:
+    com.brainhealth: DEBUG
+    root: INFO

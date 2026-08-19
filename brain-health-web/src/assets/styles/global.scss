@@ -1,0 +1,89 @@
+// Global styles for Brain Health Platform
+
+// Element Plus overrides
+:root {
+  --el-color-primary: #409EFF;
+  --el-color-success: #67C23A;
+  --el-color-warning: #E6A23C;
+  --el-color-danger: #F56C6C;
+  --el-color-info: #909399;
+}
+
+// Page card wrapper
+.page-container {
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  min-height: calc(100vh - 140px);
+}
+
+// Page header with title and actions
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+
+  h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #303133;
+  }
+}
+
+// Search filter bar
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+// Table toolbar
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+// Stat cards
+.stat-card {
+  text-align: center;
+  padding: 20px;
+
+  .stat-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #409EFF;
+  }
+
+  .stat-label {
+    font-size: 14px;
+    color: #909399;
+    margin-top: 8px;
+  }
+}
+
+// Scrollbar
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+
+  &:hover {
+    background: #909399;
+  }
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -1,0 +1,32 @@
+server:
+  port: 8005
+genetics:
+  upload:
+    storage-root: ./data/genetics
+    chunk-root: ./data/genetics-chunks
+    max-file-size-bytes: 5368709120
+spring:
+  application:
+    name: genetics-service
+  servlet:
+    multipart:
+      max-file-size: 64MB
+      max-request-size: 65MB
+  datasource:
+    url: jdbc:mysql://localhost:3306/brain_health?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: bh_user
+    password: bh_pass_2024
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redis_pass_2024
+logging:
+  level:
+    com.brainhealth: DEBUG
+    root: INFO

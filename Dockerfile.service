@@ -1,0 +1,28 @@
+FROM maven:3.9.9-eclipse-temurin-21 AS build
+WORKDIR /workspace
+COPY pom.xml .
+COPY common/pom.xml common/pom.xml
+COPY auth-service/pom.xml auth-service/pom.xml
+COPY subject-service/pom.xml subject-service/pom.xml
+COPY scale-service/pom.xml scale-service/pom.xml
+COPY imaging-service/pom.xml imaging-service/pom.xml
+COPY genetics-service/pom.xml genetics-service/pom.xml
+COPY lab-service/pom.xml lab-service/pom.xml
+COPY search-service/pom.xml search-service/pom.xml
+COPY export-service/pom.xml export-service/pom.xml
+COPY audit-service/pom.xml audit-service/pom.xml
+COPY adni-service/pom.xml adni-service/pom.xml
+COPY gateway/pom.xml gateway/pom.xml
+RUN mvn -B -DskipTests dependency:go-offline
+COPY . .
+ARG MODULE
+RUN mvn -B -pl "${MODULE}" -am package -DskipTests && \
+    find "${MODULE}/target" -maxdepth 1 -type f -name '*.jar' ! -name '*.original' -exec cp {} /workspace/app.jar \;
+
+FROM eclipse-temurin:21-jre
+RUN apt-get update && apt-get install -y --no-install-recommends libarchive-tools && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build /workspace/app.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","/app/app.jar"]

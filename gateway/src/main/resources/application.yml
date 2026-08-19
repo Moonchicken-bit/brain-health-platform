@@ -1,0 +1,78 @@
+server:
+  port: 8080
+
+spring:
+  main:
+    web-application-type: reactive
+  application:
+    name: gateway
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:redis_pass_2024}
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - com.alibaba.druid.spring.boot3.autoconfigure.DruidDataSourceAutoConfigure
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://localhost:8001}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: subject-service
+          uri: ${SUBJECT_SERVICE_URL:http://localhost:8002}
+          predicates:
+            - Path=/api/v1/subjects/**,/api/v1/sessions/**,/api/v1/dashboard/**,/api/v1/cohorts,/api/v1/institutions,/api/v1/projects,/api/v1/projects/*/subject-tags
+        - id: scale-service
+          uri: ${SCALE_SERVICE_URL:http://localhost:8003}
+          predicates:
+            - Path=/api/v1/scales/**,/api/v1/assessments/**,/api/v1/clinical-fields/**
+        - id: imaging-service
+          uri: ${IMAGING_SERVICE_URL:http://localhost:8004}
+          predicates:
+            - Path=/api/v1/imaging/**
+        - id: genetics-service
+          uri: ${GENETICS_SERVICE_URL:http://localhost:8005}
+          predicates:
+            - Path=/api/v1/genetics/**
+        - id: lab-service
+          uri: ${LAB_SERVICE_URL:http://localhost:8006}
+          predicates:
+            - Path=/api/v1/lab/**
+        - id: search-service
+          uri: ${SEARCH_SERVICE_URL:http://localhost:8007}
+          predicates:
+            - Path=/api/v1/search/**
+        - id: export-service
+          uri: ${EXPORT_SERVICE_URL:http://localhost:8008}
+          predicates:
+            - Path=/api/v1/export/**
+        - id: admin-service
+          uri: ${AUDIT_SERVICE_URL:http://localhost:8009}
+          predicates:
+            - Path=/api/v1/admin/**
+        - id: adni-service
+          uri: ${ADNI_SERVICE_URL:http://localhost:8010}
+          predicates:
+            - Path=/api/v1/adni/**
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+logging:
+  level:
+    com.brainhealth: DEBUG
+    root: INFO
